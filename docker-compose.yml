@@ -1,0 +1,11 @@
+version: "3"
+services:
+  web:
+    image: caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "./test/Caddyfile:/etc/caddy/Caddyfile:ro"
+      - "./test/sample-key.pem:/etc/caddy/sample-key.pem:ro"
+      - "./test/sample-cert.pem:/etc/caddy/sample-cert.pem:ro"

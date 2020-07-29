@@ -26,13 +26,23 @@ async fn main() -> Result<()> {
                 .required(true)
                 .index(1),
         )
+        .arg(
+            Arg::with_name("CLIENTS")
+                .help("The number of clients")
+                .default_value("5")
+                .index(2),
+        )
         .get_matches();
 
     pretty_env_logger::init();
 
     let url = matches.value_of("URL").unwrap();
-
     let url = url.parse::<hyper::Uri>().unwrap();
+
+    let clients = matches.value_of("CLIENTS").unwrap().parse::<u16>()?;
+
+    println!("URL: {}", url);
+    println!("Clients: {}", clients);
 
     let (tx, rx) = mpsc::channel::<u16>(100);
 
@@ -40,7 +50,9 @@ async fn main() -> Result<()> {
     let https = hyper_rustls::HttpsConnector::new();
     let client: Client<_, hyper::Body> = Client::builder().build(https);
     let mut futures = vec![];
-    futures.push(fetch_url(&url, &client, tx.clone(), &QUIT));
+    for _ in 0..clients {
+        futures.push(fetch_url(&url, &client, tx.clone(), &QUIT));
+    }
 
     ctrlc::set_handler(move || {
         QUIT.store(true, Ordering::Relaxed);
@@ -66,7 +78,12 @@ async fn status(mut rx: mpsc::Receiver<u16>, quit: &AtomicBool) -> Result<()> {
         let elapsed = now.elapsed().unwrap();
         if elapsed.ge(&update_interval) {
             now = SystemTime::now();
-            println!("ok: {} err: {}", count_ok, count_err);
+            println!(
+                "ok: {} err: {}, elap: {}",
+                count_ok,
+                count_err,
+                elapsed.as_millis()
+            );
             count_ok = 0;
             count_err = 0;
         }
@@ -102,7 +119,7 @@ async fn fetch_url(
     mut tx: mpsc::Sender<u16>,
     quit: &AtomicBool,
 ) -> Result<()> {
-    println!("fecthing: {}", url);
+    // println!("fecthing: {}", url);
     while !quit.load(Ordering::Relaxed) {
         let res = client.get(url.clone()).await;
         let status = match res {
@@ -128,7 +145,7 @@ async fn fetch_url(
         delay_for(Duration::from_micros(1)).await;
     }
 
-    println!("\n\nDone!");
+    // println!("\n\nDone!");
 
     Ok(())
 }

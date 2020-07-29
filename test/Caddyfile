@@ -1,0 +1,8 @@
+:80 {
+  respond "Hello World!"
+}
+
+localhost:443 {
+  tls /etc/caddy/sample-cert.pem /etc/caddy/sample-key.pem
+  respond "Hello TLS World!"
+}
