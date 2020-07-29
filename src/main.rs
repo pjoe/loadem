@@ -32,6 +32,12 @@ async fn main() -> Result<()> {
                 .default_value("5")
                 .index(2),
         )
+        .arg(
+            Arg::with_name("cert")
+                .long("cert")
+                .help("Custom certificate for HTTPS")
+                .takes_value(true),
+        )
         .get_matches();
 
     pretty_env_logger::init();
@@ -43,6 +49,9 @@ async fn main() -> Result<()> {
 
     println!("URL: {}", url);
     println!("Clients: {}", clients);
+    if let Some(cert) = matches.value_of("cert") {
+        println!("Custom cert: {}", cert);
+    }
 
     let (tx, rx) = mpsc::channel::<u16>(100);
 
@@ -78,11 +87,11 @@ async fn status(mut rx: mpsc::Receiver<u16>, quit: &AtomicBool) -> Result<()> {
         let elapsed = now.elapsed().unwrap();
         if elapsed.ge(&update_interval) {
             now = SystemTime::now();
+            let factor = 1f32 / elapsed.as_secs_f32();
             println!(
-                "ok: {} err: {}, elap: {}",
-                count_ok,
-                count_err,
-                elapsed.as_millis()
+                "Tps {:>7.2} Err {:>5.2}%",
+                count_ok as f32 * factor,
+                count_err as f32 * 100f32 / (count_ok + count_err) as f32,
             );
             count_ok = 0;
             count_err = 0;
