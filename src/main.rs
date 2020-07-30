@@ -2,20 +2,30 @@
 #![warn(rust_2018_idioms)]
 use futures::future::{join_all, FutureExt};
 use futures::select;
-use std::env;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime};
+use std::{env, fs, io};
 
 use clap::{crate_version, App, Arg};
-use hyper::{body::HttpBody as _, Client};
+use hyper::{body::HttpBody as _, client, Client};
+use simple_error::SimpleError;
 use tokio::sync::mpsc;
 use tokio::time::delay_for;
 
 // A simple type alias so as to DRY.
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() {
+    let res = tokio::runtime::Runtime::new()
+        .unwrap()
+        .block_on(loadem());
+    if let Err(e) = res {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
+}
+
+async fn loadem() -> Result<()> {
     let matches = App::new(env!("CARGO_PKG_NAME"))
         .about("Makes some load")
         // use crate_version! to pull the version number
@@ -49,14 +59,29 @@ async fn main() -> Result<()> {
 
     println!("URL: {}", url);
     println!("Clients: {}", clients);
-    if let Some(cert) = matches.value_of("cert") {
-        println!("Custom cert: {}", cert);
-    }
+    let https = match matches.value_of("cert") {
+        Some(cert_file) => {
+            println!("Custom cert: {}", cert_file);
+            let f = fs::File::open(cert_file)
+                .map_err(|_| SimpleError::new("Custom cert file not found"))?;
+            let mut rd = io::BufReader::new(f);
+            // Build an HTTP connector which supports HTTPS too.
+            let mut http = client::HttpConnector::new();
+            http.enforce_http(false);
+            // Build a TLS client, using the custom CA store for lookups.
+            let mut tls = rustls::ClientConfig::new();
+            tls.root_store
+                .add_pem_file(&mut rd)
+                .map_err(|_| SimpleError::new("Failed to load custom cert"))?;
+            // Join the above part into an HTTPS connector.
+            hyper_rustls::HttpsConnector::from((http, tls))
+        }
+        _ => hyper_rustls::HttpsConnector::new(),
+    };
 
     let (tx, rx) = mpsc::channel::<u16>(100);
 
     static QUIT: AtomicBool = AtomicBool::new(false);
-    let https = hyper_rustls::HttpsConnector::new();
     let client: Client<_, hyper::Body> = Client::builder().build(https);
     let mut futures = vec![];
     for _ in 0..clients {
