@@ -48,7 +48,7 @@ jobs:
             asset_ext: tgz
             asset_name: linux-amd64
           - os: windows-latest
-            compress: zip loadem.zip loadem.exe
+            compress: 7z a -tzip loadem.zip loadem.exe
             asset_ext: zip
             asset_name: windows-amd64
 
