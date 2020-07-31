@@ -41,16 +41,20 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         include:
           - os: ubuntu-latest
-            compress: tar -czf loadem.tgz loadem
-            asset_ext: tgz
+            compress: tar -czf loadem.tar.gz loadem
+            asset_ext: tar.gz
             asset_name: linux-amd64
           - os: windows-latest
             compress: 7z a -tzip loadem.zip loadem.exe
             asset_ext: zip
             asset_name: windows-amd64
+          - os: macos-latest
+            compress: tar -czf loadem.tar.gz loadem
+            asset_ext: tar.gz
+            asset_name: darwin-amd64
 
     steps:
       - uses: actions/checkout@v2
