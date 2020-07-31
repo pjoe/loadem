@@ -15,10 +15,14 @@ use tokio::time::delay_for;
 // A simple type alias so as to DRY.
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
+#[derive(Debug)]
+struct Response {
+    status: u16,
+    response_time: f32,
+}
+
 fn main() {
-    let res = tokio::runtime::Runtime::new()
-        .unwrap()
-        .block_on(loadem());
+    let res = tokio::runtime::Runtime::new().unwrap().block_on(loadem());
     if let Err(e) = res {
         eprintln!("Error: {}", e);
         std::process::exit(1);
@@ -79,7 +83,7 @@ async fn loadem() -> Result<()> {
         _ => hyper_rustls::HttpsConnector::new(),
     };
 
-    let (tx, rx) = mpsc::channel::<u16>(100);
+    let (tx, rx) = mpsc::channel::<Response>(100);
 
     static QUIT: AtomicBool = AtomicBool::new(false);
     let client: Client<_, hyper::Body> = Client::builder().build(https);
@@ -102,32 +106,38 @@ async fn loadem() -> Result<()> {
     Ok(())
 }
 
-async fn status(mut rx: mpsc::Receiver<u16>, quit: &AtomicBool) -> Result<()> {
+async fn status(mut rx: mpsc::Receiver<Response>, quit: &AtomicBool) -> Result<()> {
     println!("Starting");
     let update_interval = Duration::from_secs(1);
     let mut now = SystemTime::now();
     let mut count_ok: u64 = 0;
     let mut count_err: u64 = 0;
+    let mut resp_time: f32 = 0f32;
     while let Some(res) = rx.recv().await {
         let elapsed = now.elapsed().unwrap();
         if elapsed.ge(&update_interval) {
             now = SystemTime::now();
             let factor = 1f32 / elapsed.as_secs_f32();
+            let total = count_ok + count_err;
             println!(
-                "Tps {:>7.2} Err {:>5.2}%",
+                "Tps {:>7.2}, Err {:>5.2}%, Resp Time {:>6.3}",
                 count_ok as f32 * factor,
-                count_err as f32 * 100f32 / (count_ok + count_err) as f32,
+                count_err as f32 * 100f32 / total as f32,
+                resp_time / total as f32,
             );
             count_ok = 0;
             count_err = 0;
+            resp_time = 0f32;
         }
-        match res {
+        match res.status {
             0 => {}
             200..=399 => {
                 count_ok += 1;
+                resp_time += res.response_time;
             }
             _ => {
                 count_err += 1;
+                resp_time += res.response_time;
             }
         }
 
@@ -140,9 +150,13 @@ async fn status(mut rx: mpsc::Receiver<u16>, quit: &AtomicBool) -> Result<()> {
     Ok(())
 }
 
-async fn heart_beat(mut tx: mpsc::Sender<u16>) -> Result<()> {
+async fn heart_beat(mut tx: mpsc::Sender<Response>) -> Result<()> {
     loop {
-        tx.send(0).await?;
+        tx.send(Response {
+            status: 0,
+            response_time: 0f32,
+        })
+        .await?;
         delay_for(Duration::from_millis(250)).await;
     }
 }
@@ -150,11 +164,12 @@ async fn heart_beat(mut tx: mpsc::Sender<u16>) -> Result<()> {
 async fn fetch_url(
     url: &hyper::Uri,
     client: &Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>, hyper::Body>,
-    mut tx: mpsc::Sender<u16>,
+    mut tx: mpsc::Sender<Response>,
     quit: &AtomicBool,
 ) -> Result<()> {
     // println!("fecthing: {}", url);
     while !quit.load(Ordering::Relaxed) {
+        let start = SystemTime::now();
         let res = client.get(url.clone()).await;
         let status = match res {
             Ok(mut res) => {
@@ -174,7 +189,12 @@ async fn fetch_url(
             }
             _ => 900,
         };
-        tx.send(status).await?;
+        let response_time = start.elapsed().unwrap().as_secs_f32();
+        tx.send(Response {
+            status,
+            response_time,
+        })
+        .await?;
 
         delay_for(Duration::from_micros(1)).await;
     }
