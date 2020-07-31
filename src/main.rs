@@ -7,7 +7,7 @@ use std::time::{Duration, SystemTime};
 use std::{env, fs, io};
 
 use clap::{crate_version, App, Arg};
-use hyper::{body::HttpBody as _, client, Client};
+use hyper::{body::HttpBody as _, client, Client, Method, Request};
 use simple_error::SimpleError;
 use tokio::io as tokio_io;
 use tokio::io::AsyncWriteExt as _;
@@ -88,6 +88,18 @@ async fn loadem() -> Result<()> {
         matches.value_of("CLIENTS").unwrap().parse::<u16>()?
     };
     let time_limit = matches.value_of("time-limit").unwrap().parse::<u64>()?;
+    let headers: Vec<(&str, &str)> = match matches.values_of("header") {
+        Some(vals) => vals
+            .map(|h| {
+                let parts: Vec<&str> = h.splitn(2, ':').collect();
+                match parts.len() {
+                    1 => (parts[0], ""),
+                    _ => (parts[0], parts[1].trim_start()),
+                }
+            })
+            .collect(),
+        None => vec![],
+    };
 
     println!("URL: {}", url);
     println!("Clients: {}", clients);
@@ -117,7 +129,7 @@ async fn loadem() -> Result<()> {
     let client: Client<_, hyper::Body> = Client::builder().build(https);
     let mut futures = vec![];
     for _ in 0..clients {
-        futures.push(fetch_url(&url, &client, tx.clone(), test, &QUIT));
+        futures.push(fetch_url(&url, &client, &headers, tx.clone(), test, &QUIT));
     }
 
     ctrlc::set_handler(move || {
@@ -206,13 +218,19 @@ async fn heart_beat(mut tx: mpsc::Sender<Response>) -> Result<()> {
 async fn fetch_url(
     url: &hyper::Uri,
     client: &Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>, hyper::Body>,
+    headers: &Vec<(&str, &str)>,
     mut tx: mpsc::Sender<Response>,
     test: bool,
     quit: &AtomicBool,
 ) -> Result<()> {
     while !quit.load(Ordering::Relaxed) {
         let start = SystemTime::now();
-        let res = client.get(url.clone()).await;
+        let mut req_builder = Request::builder().method(Method::GET).uri(url);
+        for (header, value) in headers.iter() {
+            req_builder = req_builder.header(*header, *value);
+        }
+        let req = req_builder.body(hyper::Body::empty())?;
+        let res = client.request(req).await;
         let status = match res {
             Ok(mut res) => {
                 let mut status: u16 = res.status().into();
