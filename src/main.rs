@@ -52,6 +52,14 @@ async fn loadem() -> Result<()> {
                 .help("Custom certificate for HTTPS")
                 .takes_value(true),
         )
+        .arg(
+            Arg::with_name("time-limit")
+                .long("time-limit")
+                .short("l")
+                .help("Time limit. Test will end after specified number of seconds")
+                .default_value("0")
+                .takes_value(true),
+        )
         .get_matches();
 
     pretty_env_logger::init();
@@ -60,6 +68,7 @@ async fn loadem() -> Result<()> {
     let url = url.parse::<hyper::Uri>().unwrap();
 
     let clients = matches.value_of("CLIENTS").unwrap().parse::<u16>()?;
+    let time_limit = matches.value_of("time-limit").unwrap().parse::<u64>()?;
 
     println!("URL: {}", url);
     println!("Clients: {}", clients);
@@ -101,7 +110,19 @@ async fn loadem() -> Result<()> {
         _ = join_all(futures).fuse() => {}
         _ = status(rx, &QUIT).fuse() => {}
         _ = heart_beat(tx.clone()).fuse() => {}
-        _ = delay_for(Duration::from_secs(60)).fuse() => {}
+        _ = timeout(time_limit).fuse() => {}
+    }
+    Ok(())
+}
+
+async fn timeout(limit: u64) -> Result<()> {
+    match limit {
+        0 => loop {
+            delay_for(Duration::from_secs(1000)).await;
+        },
+        secs => {
+            delay_for(Duration::from_secs(secs)).await;
+        }
     }
     Ok(())
 }
