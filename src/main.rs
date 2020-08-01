@@ -218,7 +218,7 @@ async fn heart_beat(mut tx: mpsc::Sender<Response>) -> Result<()> {
 async fn fetch_url(
     url: &hyper::Uri,
     client: &Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>, hyper::Body>,
-    headers: &Vec<(&str, &str)>,
+    headers: &[(&str, &str)],
     mut tx: mpsc::Sender<Response>,
     test: bool,
     quit: &AtomicBool,
