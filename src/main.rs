@@ -129,7 +129,7 @@ async fn loadem() -> Result<()> {
     let client: Client<_, hyper::Body> = Client::builder().build(https);
     let mut futures = vec![];
     for _ in 0..clients {
-        futures.push(fetch_url(&url, &client, &headers, tx.clone(), test, &QUIT));
+        futures.push(fetch_url(&url, &client, &headers, tx.clone(), test));
     }
 
     ctrlc::set_handler(move || {
@@ -221,9 +221,8 @@ async fn fetch_url(
     headers: &[(&str, &str)],
     mut tx: mpsc::Sender<Response>,
     test: bool,
-    quit: &AtomicBool,
 ) -> Result<()> {
-    while !quit.load(Ordering::Relaxed) {
+    loop {
         let start = SystemTime::now();
         let mut req_builder = Request::builder().method(Method::GET).uri(url);
         for (header, value) in headers.iter() {
