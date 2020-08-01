@@ -141,40 +141,46 @@ async fn loadem() -> Result<()> {
         _ = join_all(futures).fuse() => {}
         _ = status(rx, test, &QUIT).fuse() => {}
         _ = heart_beat(tx.clone()).fuse() => {}
-        _ = timeout(time_limit).fuse() => {}
+        _ = timeout(time_limit, tx.clone()).fuse() => {}
     }
     Ok(())
 }
 
-async fn timeout(limit: u64) -> Result<()> {
-    match limit {
-        0 => loop {
-            delay_for(Duration::from_secs(1000)).await;
-        },
-        secs => {
-            delay_for(Duration::from_secs(secs)).await;
-        }
+async fn timeout(limit: u64, mut tx: mpsc::Sender<Response>) -> Result<()> {
+    if limit > 0 {
+        delay_for(Duration::from_secs(limit)).await;
+        tx.send(Response {
+            status: 9999,
+            response_time: 0f32,
+        })
+        .await?;
     }
-    Ok(())
+    loop {
+        delay_for(Duration::from_secs(1000)).await;
+    }
 }
 
 async fn status(mut rx: mpsc::Receiver<Response>, test: bool, quit: &AtomicBool) -> Result<()> {
     println!("Starting");
     let update_interval = Duration::from_secs(1);
-    let mut now = SystemTime::now();
+    let start_time = SystemTime::now();
+    let mut total_ok: u64 = 0;
+    let mut total_error: u64 = 0;
+    let mut total_resp_time = 0f32;
+    let mut max_resp_time = 0f32;
+    let mut now = start_time;
     let mut count_ok: u64 = 0;
     let mut count_err: u64 = 0;
-    let mut resp_time: f32 = 0f32;
+    let mut resp_time = 0f32;
     while let Some(res) = rx.recv().await {
         let elapsed = now.elapsed().unwrap();
         if elapsed.ge(&update_interval) {
             now = SystemTime::now();
-            let factor = 1f32 / elapsed.as_secs_f32();
             let total = count_ok + count_err;
             if !test {
                 println!(
                     "Tps {:>7.2}, Err {:>5.2}%, Resp Time {:>6.3}",
-                    count_ok as f32 * factor,
+                    count_ok as f32 / elapsed.as_secs_f32(),
                     count_err as f32 * 100f32 / total as f32,
                     resp_time / total as f32,
                 );
@@ -185,22 +191,42 @@ async fn status(mut rx: mpsc::Receiver<Response>, test: bool, quit: &AtomicBool)
         }
         match res.status {
             0 => {}
+            9999 => {
+                break;
+            }
             200..=399 => {
                 count_ok += 1;
+                total_ok += 1;
                 resp_time += res.response_time;
+                total_resp_time += res.response_time;
+                max_resp_time = max_resp_time.max(res.response_time);
             }
             _ => {
                 count_err += 1;
+                total_error += 1;
                 resp_time += res.response_time;
+                total_resp_time += res.response_time;
+                max_resp_time = max_resp_time.max(res.response_time);
             }
         }
 
         if quit.load(Ordering::Relaxed) {
-            println!();
             break;
         }
     }
-    println!("Done");
+    println!();
+    let elapsed = start_time.elapsed().unwrap().as_secs_f32();
+    let total_count = total_ok + total_error;
+    println!(
+        "Completed {} requests in {:.2} seconds",
+        total_count, elapsed
+    );
+    println!("Total TPS: {:.2}", total_ok as f32 / elapsed);
+    println!(
+        "Avg. Response time: {:>6.3}",
+        total_resp_time / total_count as f32
+    );
+    println!("Max Response time: {:>7.3}", max_resp_time);
     Ok(())
 }
 
