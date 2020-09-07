@@ -420,7 +420,7 @@ checksum = "a9f8082297d534141b30c8d39e9b1773713ab50fdbe4ff30f750d063b3bfd701"
 
 [[package]]
 name = "loadem"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "clap",
  "ctrlc",

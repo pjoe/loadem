@@ -18,11 +18,16 @@ $ loadem http://localhost 200
 URL: http://localhost/
 Clients: 200
 Starting
-Tps 2778.67 Err  0.00%
-Tps 3674.29 Err  0.00%
-Tps 3565.66 Err  0.00%
-Tps 4097.57 Err  0.00%
-Tps 3796.36 Err  0.00%
+MaTps 3410.85, Tps 3410.85, Err  0.00%, Resp Time  0.026
+MaTps 3718.58, Tps 4026.32, Err  0.00%, Resp Time  0.022
+MaTps 3732.09, Tps 3759.11, Err  0.00%, Resp Time  0.022
+MaTps 3871.03, Tps 4287.86, Err  0.00%, Resp Time  0.020
+MaTps 3941.79, Tps 4224.79, Err  0.00%, Resp Time  0.020
+MaTps 4027.94, Tps 4458.70, Err  0.00%, Resp Time  0.019
+MaTps 4102.18, Tps 4547.63, Err  0.00%, Resp Time  0.017
 ^C
-Done
+Completed 30743 requests in 7.47 seconds
+Total TPS: 4114.94
+Avg. Response time:  0.021
+Max Response time:   3.155
 ```
