@@ -5,6 +5,7 @@ use futures::select;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime};
 use std::{env, fs, io};
+use std::collections::VecDeque;
 
 use clap::{crate_version, App, Arg};
 use hyper::{body::HttpBody as _, client, Client, Method, Request};
@@ -172,6 +173,9 @@ async fn status(mut rx: mpsc::Receiver<Response>, test: bool, quit: &AtomicBool)
     let mut count_ok: u64 = 0;
     let mut count_err: u64 = 0;
     let mut resp_time = 0f32;
+    let mut ma_buf = VecDeque::new();
+    let mut tps_ma_acc = 0f32;
+    let ma_size = 20;
     while let Some(res) = rx.recv().await {
         let elapsed = now.elapsed().unwrap();
         if elapsed.ge(&update_interval) {
@@ -180,13 +184,24 @@ async fn status(mut rx: mpsc::Receiver<Response>, test: bool, quit: &AtomicBool)
             if !test {
                 let mut err_percent = 0f32;
                 let mut resp_avg = 0f32;
+                let tps = count_ok as f32 / elapsed.as_secs_f32();
                 if total > 0 {
                     err_percent = count_err as f32 * 100f32 / total as f32;
                     resp_avg = resp_time / total as f32
                 }
+
+                ma_buf.push_back(tps);
+                tps_ma_acc += tps;
+                if ma_buf.len() > ma_size {
+                    let tps_old = ma_buf.pop_front().unwrap_or(0f32);
+                    tps_ma_acc -= tps_old;
+                }
+                let tps_ma = tps_ma_acc / ma_buf.len() as f32;
+
                 println!(
-                    "Tps {:>7.2}, Err {:>5.2}%, Resp Time {:>6.3}",
-                    count_ok as f32 / elapsed.as_secs_f32(),
+                    "MaTps {:>7.2}, Tps {:>7.2}, Err {:>5.2}%, Resp Time {:>6.3}",
+                    tps_ma,
+                    tps,
                     err_percent,
                     resp_avg,
                 );
