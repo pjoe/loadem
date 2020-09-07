@@ -178,11 +178,17 @@ async fn status(mut rx: mpsc::Receiver<Response>, test: bool, quit: &AtomicBool)
             now = SystemTime::now();
             let total = count_ok + count_err;
             if !test {
+                let mut err_percent = 0f32;
+                let mut resp_avg = 0f32;
+                if total > 0 {
+                    err_percent = count_err as f32 * 100f32 / total as f32;
+                    resp_avg = resp_time / total as f32
+                }
                 println!(
                     "Tps {:>7.2}, Err {:>5.2}%, Resp Time {:>6.3}",
                     count_ok as f32 / elapsed.as_secs_f32(),
-                    count_err as f32 * 100f32 / total as f32,
-                    resp_time / total as f32,
+                    err_percent,
+                    resp_avg,
                 );
             }
             count_ok = 0;
@@ -217,15 +223,16 @@ async fn status(mut rx: mpsc::Receiver<Response>, test: bool, quit: &AtomicBool)
     println!();
     let elapsed = start_time.elapsed().unwrap().as_secs_f32();
     let total_count = total_ok + total_error;
+    let mut resp_avg = 0f32;
+    if total_count > 0 {
+        resp_avg = total_resp_time / total_count as f32;
+    }
     println!(
         "Completed {} requests in {:.2} seconds",
         total_count, elapsed
     );
     println!("Total TPS: {:.2}", total_ok as f32 / elapsed);
-    println!(
-        "Avg. Response time: {:>6.3}",
-        total_resp_time / total_count as f32
-    );
+    println!("Avg. Response time: {:>6.3}", resp_avg);
     println!("Max Response time: {:>7.3}", max_resp_time);
     Ok(())
 }
