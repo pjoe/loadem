@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop';
 
-$url64 = 'https://github.com/pjoe/loadem/releases/download/0.2.1/loadem-0.2.1-windows-amd64.zip'
-$checksum64 = '42E4B05CA6EDAD0D874A873AEA9BFF6D0BBC123B90A1B955BF2B714D3DDE431A63CCF15CC173F478C42F5AA1529C6D3F232E96BAAD2163DDC023B0337C17CB7D'
+$url64 = 'https://github.com/pjoe/loadem/releases/download/0.2.2/loadem-0.2.2-windows-amd64.zip'
+$checksum64 = '4ED5713A5DF1104A257DDF3D1360A568572A583C089CFFAACACDE4A90D8B1656C200F0187BE6D105232911E294CEC32FC471FDEA7489E88D28FADD1614E84FC6'
 $checksumType64 = 'sha512'
 $UnzipLocation = Join-Path $env:ChocolateyInstall (Join-Path 'lib' $env:ChocolateyPackageName)
 Install-ChocolateyZipPackage -PackageName $env:ChocolateyPackageName -Url64 $url64 -UnzipLocation $UnzipLocation -CheckSum64 $checksum64 -CheckSumType64 $checksumType64
