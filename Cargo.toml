@@ -2,7 +2,18 @@
 name = "loadem"
 version = "0.2.2"
 authors = ["Pelle Johnsen <pelle.johnsen@gmail.com>"]
+license = "Apache-2.0"
 edition = "2018"
+description = "Command line tool for emulating web load from thousands of clients."
+keywords = ["loadtesting", "web", "tool"]
+categories = ["command-line-utilities", "development-tools::profiling"]
+readme = "README.md"
+homepage = "https://github.com/pjoe/loadem"
+repository = "https://github.com/pjoe/loadem"
+exclude = [
+    "/deploy",
+    "/.github",
+]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
