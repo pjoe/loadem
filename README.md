@@ -11,6 +11,16 @@ This is the spiritual successor to [OpenWebLoad](https://pjoe.github.io/openwebl
 
 Download binaries from https://github.com/pjoe/loadem/releases and add to you path.
 
+### Windows
+
+You can also install with [Chocolatey](https://chocolatey.org/)
+
+In PowerShell with Admin rights:
+
+```
+choco install loadem
+```
+
 ## Usage
 
 ```
