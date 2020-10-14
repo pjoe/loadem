@@ -2,13 +2,13 @@
 #![warn(rust_2018_idioms)]
 use futures::future::{join_all, FutureExt};
 use futures::select;
+use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime};
 use std::{env, fs, io};
-use std::collections::VecDeque;
 
 use clap::{crate_version, App, Arg};
-use hyper::{body::HttpBody as _, client, Client, Method, Request};
+use hyper::{body::HttpBody as _, client, Body, Client, Method, Request};
 use simple_error::SimpleError;
 use tokio::io as tokio_io;
 use tokio::io::AsyncWriteExt as _;
@@ -22,6 +22,14 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>
 struct Response {
     status: u16,
     response_time: f32,
+}
+
+struct RequestInfo<'a> {
+    url: &'a str,
+    method: &'a Method,
+    test: bool,
+    headers: Vec<(&'a str, &'a str)>,
+    data: &'a String,
 }
 
 fn main() {
@@ -75,12 +83,27 @@ async fn loadem() -> Result<()> {
                     .multiple(true)
                     .takes_value(true),
             )
+            .arg(
+                Arg::with_name("data")
+                    .long("data")
+                    .short("d")
+                    .help("Raw data to be sent with request")
+                    .multiple(true)
+                    .takes_value(true),
+            )
+            .arg(
+                Arg::with_name("method")
+                    .long("method")
+                    .short("X")
+                    .help("HTTP method to use")
+                    .takes_value(true),
+            )
             .get_matches();
 
     pretty_env_logger::init();
 
     let url = matches.value_of("URL").unwrap();
-    let url = url.parse::<hyper::Uri>().unwrap();
+    url.parse::<hyper::Uri>().unwrap();
 
     let test = matches.is_present("test");
     let clients = if test {
@@ -101,8 +124,39 @@ async fn loadem() -> Result<()> {
             .collect(),
         None => vec![],
     };
+    let data: String = matches
+        .values_of("data")
+        .map(|d| d.map(|d| d.to_string()).collect::<Vec<String>>().join("&"))
+        .unwrap_or_default();
 
-    println!("URL: {}", url);
+    let mut method = Method::GET;
+    if !data.is_empty() {
+        method = Method::POST;
+    }
+    if let Some(m) = matches.value_of("method") {
+        method = match m.to_uppercase().as_str() {
+            "GET" => Method::GET,
+            "HEAD" => Method::HEAD,
+            "OPTIONS" => Method::OPTIONS,
+            "DELETE" => Method::DELETE,
+            "POST" => Method::POST,
+            "PATCH" => Method::PATCH,
+            "PUT" => Method::PUT,
+            other => {
+                println!("Uknown method: {}", other);
+                method
+            }
+        }
+    }
+
+    let req_info = RequestInfo {
+        url,
+        method: &method,
+        headers,
+        data: &data,
+        test,
+    };
+    println!("URL: {}", req_info.url);
     println!("Clients: {}", clients);
     let https = match matches.value_of("cert") {
         Some(cert_file) => {
@@ -130,7 +184,7 @@ async fn loadem() -> Result<()> {
     let client: Client<_, hyper::Body> = Client::builder().build(https);
     let mut futures = vec![];
     for _ in 0..clients {
-        futures.push(fetch_url(&url, &client, &headers, tx.clone(), test));
+        futures.push(fetch_url(&req_info, &client, tx.clone()));
     }
 
     ctrlc::set_handler(move || {
@@ -200,10 +254,7 @@ async fn status(mut rx: mpsc::Receiver<Response>, test: bool, quit: &AtomicBool)
 
                 println!(
                     "MaTps {:>7.2}, Tps {:>7.2}, Err {:>5.2}%, Resp Time {:>6.3}",
-                    tps_ma,
-                    tps,
-                    err_percent,
-                    resp_avg,
+                    tps_ma, tps, err_percent, resp_avg,
                 );
             }
             count_ok = 0;
@@ -263,25 +314,30 @@ async fn heart_beat(mut tx: mpsc::Sender<Response>) -> Result<()> {
     }
 }
 
-async fn fetch_url(
-    url: &hyper::Uri,
+async fn fetch_url<'a>(
+    req_info: &RequestInfo<'a>,
     client: &Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>, hyper::Body>,
-    headers: &[(&str, &str)],
     mut tx: mpsc::Sender<Response>,
-    test: bool,
 ) -> Result<()> {
     loop {
         let start = SystemTime::now();
-        let mut req_builder = Request::builder().method(Method::GET).uri(url);
-        for (header, value) in headers.iter() {
+        let mut req_builder = Request::builder().method(req_info.method).uri(req_info.url);
+        for (header, value) in req_info.headers.iter() {
             req_builder = req_builder.header(*header, *value);
         }
-        let req = req_builder.body(hyper::Body::empty())?;
+        let req = if matches!(
+            req_info.method,
+            &Method::POST | &Method::PUT | &Method::PATCH
+        ) {
+            req_builder.body(Body::from(req_info.data.clone()))?
+        } else {
+            req_builder.body(hyper::Body::empty())?
+        };
         let res = client.request(req).await;
         let status = match res {
             Ok(mut res) => {
                 let mut status: u16 = res.status().into();
-                if test {
+                if req_info.test {
                     println!("Status: {}", status);
                     println!("Headers: {:#?}\n", res.headers());
                     println!("Body:");
@@ -294,7 +350,7 @@ async fn fetch_url(
                         status = 901;
                         break;
                     }
-                    if test {
+                    if req_info.test {
                         tokio_io::stdout().write_all(&chunk?).await?;
                     }
                 }
@@ -311,7 +367,7 @@ async fn fetch_url(
         .await?;
 
         delay_for(Duration::from_micros(1)).await;
-        if test {
+        if req_info.test {
             println!();
             break;
         }
