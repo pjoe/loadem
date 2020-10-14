@@ -99,6 +99,7 @@ jobs:
         if: ${{ startsWith(github.ref, 'refs/tags') && runner.os == 'Windows'}}
         env:
           api_key: ${{ secrets.CHOCO_API_KEY}}
+        shell: powershell
         run: |
           cinst au -y
           cd deploy\choco\loadem
