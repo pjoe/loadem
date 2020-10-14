@@ -1,11 +1,20 @@
 version: "3"
 services:
-  web:
-    image: caddy
+  # web:
+  #   image: caddy
+  #   ports:
+  #     - "8000:8000"
+  #     - "8443:8443"
+  #   volumes:
+  #     - "./test/Caddyfile:/etc/caddy/Caddyfile:ro"
+  #     - "./test/sample-key.pem:/etc/caddy/sample-key.pem:ro"
+  #     - "./test/sample-cert.pem:/etc/caddy/sample-cert.pem:ro"
+  echo:
+    image: k8s.gcr.io/echoserver:1.10
     ports:
-      - "80:80"
-      - "443:443"
+      - "8000:8080"
+      - "8443:8443"
     volumes:
-      - "./test/Caddyfile:/etc/caddy/Caddyfile:ro"
-      - "./test/sample-key.pem:/etc/caddy/sample-key.pem:ro"
-      - "./test/sample-cert.pem:/etc/caddy/sample-cert.pem:ro"
+      - "./test/sample-key.pem:/certs/privateKey.key:ro"
+      - "./test/sample-cert.pem:/certs/certificate.crt:ro"
+    entrypoint: 'nginx -g "daemon off;"'
