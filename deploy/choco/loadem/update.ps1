@@ -30,7 +30,7 @@ function global:au_GetLatest {
   @{
     URL64          = $domain + $url
     Version        = $version
-    ChecksumType64 = 'sha512'
+    ChecksumType64 = 'sha256'
   }
 }
 
