@@ -95,3 +95,8 @@ jobs:
           asset_path: ./target/release/loadem.${{matrix.asset_ext}}
           asset_name: loadem-${{steps.get_version.outputs.VERSION}}-${{matrix.asset_name}}.${{matrix.asset_ext}}
           asset_content_type: application/octet-stream
+      - name: Deploy to crates.io
+        if: ${{ startsWith(github.ref, 'refs/tags') && runner.os == 'Linux'}}
+        uses: actions-rs/cargo@v1
+        with:
+          command: publish
