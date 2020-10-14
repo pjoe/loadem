@@ -95,17 +95,17 @@ jobs:
           asset_path: ./target/release/loadem.${{matrix.asset_ext}}
           asset_name: loadem-${{steps.get_version.outputs.VERSION}}-${{matrix.asset_name}}.${{matrix.asset_ext}}
           asset_content_type: application/octet-stream
-      - name: Deploy to crates.io
-        if: ${{ startsWith(github.ref, 'refs/tags') && runner.os == 'Linux'}}
-        uses: actions-rs/cargo@v1
-        with:
-          command: publish
-          args: --token ${{ secrets.CRATES_IO_TOKEN }}
       - name: Deploy to choco
         if: ${{ startsWith(github.ref, 'refs/tags') && runner.os == 'Windows'}}
         env:
           api_key: ${{ secrets.CHOCO_API_KEY}}
         run: |
           cinst au -y
-          cd deploy/choco/loadem
-          update.ps1
+          cd deploy\choco\loadem
+          .\update.ps1
+      - name: Deploy to crates.io
+        if: ${{ startsWith(github.ref, 'refs/tags') && runner.os == 'Linux'}}
+        uses: actions-rs/cargo@v1
+        with:
+          command: publish
+          args: --token ${{ secrets.CRATES_IO_TOKEN }}
