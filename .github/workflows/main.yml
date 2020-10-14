@@ -104,7 +104,7 @@ jobs:
       - name: Deploy to choco
         if: ${{ startsWith(github.ref, 'refs/tags') && runner.os == 'Windows'}}
         env:
-          VERSION: ${{steps.get_version.outputs.VERSION}}
+          api_key: ${{ secrets.CHOCO_API_KEY}}
         run: |
           cinst au -y
           cd deploy/choco/loadem
