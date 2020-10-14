@@ -101,3 +101,11 @@ jobs:
         with:
           command: publish
           args: --token ${{ secrets.CRATES_IO_TOKEN }}
+      - name: Deploy to choco
+        if: ${{ startsWith(github.ref, 'refs/tags') && runner.os == 'Windows'}}
+        env:
+          VERSION: ${{steps.get_version.outputs.VERSION}}
+        run: |
+          cinst au -y
+          cd deploy/choco/loadem
+          update.ps1

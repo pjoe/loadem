@@ -1,6 +1,6 @@
 [package]
 name = "loadem"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["Pelle Johnsen <pelle.johnsen@gmail.com>"]
 license = "Apache-2.0"
 edition = "2018"
