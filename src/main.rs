@@ -314,8 +314,8 @@ async fn heart_beat(mut tx: mpsc::Sender<Response>) -> Result<()> {
     }
 }
 
-async fn fetch_url<'a>(
-    req_info: &RequestInfo<'a>,
+async fn fetch_url(
+    req_info: &RequestInfo<'_>,
     client: &Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>, hyper::Body>,
     mut tx: mpsc::Sender<Response>,
 ) -> Result<()> {

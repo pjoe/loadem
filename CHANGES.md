@@ -1,5 +1,9 @@
 # loadem changelog
 
+## 0.2.7 - 14-jan-2021
+
+- Fix Ctrl-C issue when deploying with Chocolatey
+
 ## 0.2.6 - 14-oct-2020
 
 - CI publish to Chocolatey
