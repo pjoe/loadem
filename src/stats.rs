@@ -4,7 +4,7 @@ pub fn sort(data: &mut Vec<f32>) {
     data.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
 }
 
-pub fn extend_sorted(data: &mut Vec<f32>, new_data: &Vec<f32>) {
+pub fn extend_sorted(data: &mut Vec<f32>, new_data: &[f32]) {
     // reverse "merge sort" O(N), N = len(new_data)
     let mut old_idx = data.len();
     data.resize(data.len() + new_data.len(), 0.0);
@@ -36,7 +36,7 @@ pub fn extend_sorted(data: &mut Vec<f32>, new_data: &Vec<f32>) {
     }
 }
 
-pub fn percentile(data: &Vec<f32>, pct: f32) -> f32 {
+pub fn percentile(data: &[f32], pct: f32) -> f32 {
     assert!(pct >= 0.0);
     let hundred: f32 = 100.0;
     assert!(pct <= hundred);
@@ -44,7 +44,7 @@ pub fn percentile(data: &Vec<f32>, pct: f32) -> f32 {
         0 => NAN,
         1 => data[0],
         len => {
-            if pct == hundred {
+            if (pct - hundred).abs() < f32::EPSILON {
                 return data[len -1];
             }
             let length = (len - 1) as f32;
