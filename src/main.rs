@@ -1,19 +1,21 @@
 #![deny(warnings)]
 #![warn(rust_2018_idioms)]
-use futures::future::{join_all, FutureExt};
-use futures::select;
-use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Duration, SystemTime};
-use std::{env, fs, io};
-
 use clap::{crate_version, App, Arg};
+use futures::{
+    future::{join_all, FutureExt},
+    select,
+};
 use hyper::{body::HttpBody as _, client, Body, Client, Method, Request};
 use simple_error::SimpleError;
-use tokio::io as tokio_io;
-use tokio::io::AsyncWriteExt as _;
-use tokio::sync::mpsc;
-use tokio::time::delay_for;
+use std::{
+    collections::VecDeque,
+    env, fs, io,
+    sync::atomic::{AtomicBool, Ordering},
+    time::{Duration, SystemTime},
+};
+use tokio::{io as tokio_io, io::AsyncWriteExt as _, sync::mpsc, time::delay_for};
+
+mod stats;
 
 // A simple type alias so as to DRY.
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
@@ -194,7 +196,7 @@ async fn loadem() -> Result<()> {
 
     select! {
         _ = join_all(futures).fuse() => {}
-        _ = status(rx, test, &QUIT).fuse() => {}
+        _ = status(rx, test, url, clients, &QUIT).fuse() => {}
         _ = heart_beat(tx.clone()).fuse() => {}
         _ = timeout(time_limit, tx.clone()).fuse() => {}
     }
@@ -215,7 +217,7 @@ async fn timeout(limit: u64, mut tx: mpsc::Sender<Response>) -> Result<()> {
     }
 }
 
-async fn status(mut rx: mpsc::Receiver<Response>, test: bool, quit: &AtomicBool) -> Result<()> {
+async fn status(mut rx: mpsc::Receiver<Response>, test: bool, url: &str, clients: u16, quit: &AtomicBool) -> Result<()> {
     println!("Starting");
     let update_interval = Duration::from_secs(1);
     let start_time = SystemTime::now();
@@ -230,7 +232,34 @@ async fn status(mut rx: mpsc::Receiver<Response>, test: bool, quit: &AtomicBool)
     let mut ma_buf = VecDeque::new();
     let mut tps_ma_acc = 0f32;
     let ma_size = 20;
+    let mut latencies = Vec::<f32>::new();
+    let mut new_latencies = Vec::<f32>::new();
     while let Some(res) = rx.recv().await {
+        match res.status {
+            0 => {}
+            9999 => {
+                break;
+            }
+            200..=399 => {
+                count_ok += 1;
+                total_ok += 1;
+                resp_time += res.response_time;
+                total_resp_time += res.response_time;
+                max_resp_time = max_resp_time.max(res.response_time);
+                new_latencies.push(res.response_time);
+            }
+            _ => {
+                count_err += 1;
+                total_error += 1;
+                resp_time += res.response_time;
+                total_resp_time += res.response_time;
+                max_resp_time = max_resp_time.max(res.response_time);
+                new_latencies.push(res.response_time);
+            }
+        }
+        if quit.load(Ordering::Relaxed) {
+            break;
+        }
         let elapsed = now.elapsed().unwrap();
         if elapsed.ge(&update_interval) {
             now = SystemTime::now();
@@ -252,54 +281,46 @@ async fn status(mut rx: mpsc::Receiver<Response>, test: bool, quit: &AtomicBool)
                 }
                 let tps_ma = tps_ma_acc / ma_buf.len() as f32;
 
+                stats::sort(&mut new_latencies);
+                stats::extend_sorted(&mut latencies, &new_latencies);
+
                 println!(
-                    "MaTps {:>7.2}, Tps {:>7.2}, Err {:>5.2}%, Resp Time {:>6.3}",
-                    tps_ma, tps, err_percent, resp_avg,
+                    "MaTps {:>7.2}, Tps {:>7.2}, Err {:>5.2}%, Lat Avg {:>6.3}, P50 {:>6.3}, P99 {:>6.3}, P99.9 {:>6.3}",
+                    tps_ma, tps, err_percent,
+                    resp_avg,
+                    stats::percentile(&new_latencies, 50.0),
+                    stats::percentile(&new_latencies, 99.0),
+                    stats::percentile(&new_latencies, 99.9),
                 );
             }
             count_ok = 0;
             count_err = 0;
             resp_time = 0f32;
-        }
-        match res.status {
-            0 => {}
-            9999 => {
-                break;
-            }
-            200..=399 => {
-                count_ok += 1;
-                total_ok += 1;
-                resp_time += res.response_time;
-                total_resp_time += res.response_time;
-                max_resp_time = max_resp_time.max(res.response_time);
-            }
-            _ => {
-                count_err += 1;
-                total_error += 1;
-                resp_time += res.response_time;
-                total_resp_time += res.response_time;
-                max_resp_time = max_resp_time.max(res.response_time);
-            }
-        }
-
-        if quit.load(Ordering::Relaxed) {
-            break;
+            new_latencies.clear();
         }
     }
     println!();
+    stats::sort(&mut new_latencies);
+    stats::extend_sorted(&mut latencies, &new_latencies);
     let elapsed = start_time.elapsed().unwrap().as_secs_f32();
     let total_count = total_ok + total_error;
     let mut resp_avg = 0f32;
     if total_count > 0 {
         resp_avg = total_resp_time / total_count as f32;
     }
+    println!("URL: {}", url);
+    println!("Clients: {}", clients);
     println!(
         "Completed {} requests in {:.2} seconds",
         total_count, elapsed
     );
     println!("Total TPS: {:.2}", total_ok as f32 / elapsed);
-    println!("Avg. Response time: {:>6.3}", resp_avg);
-    println!("Max Response time: {:>7.3}", max_resp_time);
+    println!("Latency:");
+    println!(" Avg.  {:>6.3}", resp_avg);
+    println!(" P50   {:>6.3}", stats::percentile(&latencies, 50.0));
+    println!(" P99   {:>6.3}", stats::percentile(&latencies, 99.0));
+    println!(" P99.9 {:>6.3}", stats::percentile(&latencies, 99.9));
+    println!(" Max  {:>7.3}", max_resp_time);
     Ok(())
 }
 
