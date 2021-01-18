@@ -217,7 +217,13 @@ async fn timeout(limit: u64, mut tx: mpsc::Sender<Response>) -> Result<()> {
     }
 }
 
-async fn status(mut rx: mpsc::Receiver<Response>, test: bool, url: &str, clients: u16, quit: &AtomicBool) -> Result<()> {
+async fn status(
+    mut rx: mpsc::Receiver<Response>,
+    test: bool,
+    url: &str,
+    clients: u16,
+    quit: &AtomicBool,
+) -> Result<()> {
     println!("Starting");
     let update_interval = Duration::from_secs(1);
     let start_time = SystemTime::now();

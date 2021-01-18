@@ -45,7 +45,7 @@ pub fn percentile(data: &[f32], pct: f32) -> f32 {
         1 => data[0],
         len => {
             if (pct - hundred).abs() < f32::EPSILON {
-                return data[len -1];
+                return data[len - 1];
             }
             let length = (len - 1) as f32;
             let rank = (pct / hundred) * length;
@@ -59,10 +59,9 @@ pub fn percentile(data: &[f32], pct: f32) -> f32 {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use super::{sort, extend_sorted, percentile};
+    use super::{extend_sorted, percentile, sort};
 
     #[test]
     fn it_works() {
