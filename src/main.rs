@@ -13,7 +13,7 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
     time::{Duration, SystemTime},
 };
-use tokio::{io as tokio_io, io::AsyncWriteExt as _, sync::mpsc, time::delay_for};
+use tokio::{io as tokio_io, io::AsyncWriteExt as _, sync::mpsc, time::sleep};
 
 mod stats;
 
@@ -102,8 +102,6 @@ async fn loadem() -> Result<()> {
             )
             .get_matches();
 
-    pretty_env_logger::init();
-
     let url = matches.value_of("URL").unwrap();
     url.parse::<hyper::Uri>().unwrap();
 
@@ -177,7 +175,7 @@ async fn loadem() -> Result<()> {
             // Join the above part into an HTTPS connector.
             hyper_rustls::HttpsConnector::from((http, tls))
         }
-        _ => hyper_rustls::HttpsConnector::new(),
+        _ => hyper_rustls::HttpsConnector::with_native_roots(),
     };
 
     let (tx, rx) = mpsc::channel::<Response>(100);
@@ -203,9 +201,9 @@ async fn loadem() -> Result<()> {
     Ok(())
 }
 
-async fn timeout(limit: u64, mut tx: mpsc::Sender<Response>) -> Result<()> {
+async fn timeout(limit: u64, tx: mpsc::Sender<Response>) -> Result<()> {
     if limit > 0 {
-        delay_for(Duration::from_secs(limit)).await;
+        sleep(Duration::from_secs(limit)).await;
         tx.send(Response {
             status: 9999,
             response_time: 0f32,
@@ -213,7 +211,7 @@ async fn timeout(limit: u64, mut tx: mpsc::Sender<Response>) -> Result<()> {
         .await?;
     }
     loop {
-        delay_for(Duration::from_secs(1000)).await;
+        sleep(Duration::from_secs(1000)).await;
     }
 }
 
@@ -330,21 +328,21 @@ async fn status(
     Ok(())
 }
 
-async fn heart_beat(mut tx: mpsc::Sender<Response>) -> Result<()> {
+async fn heart_beat(tx: mpsc::Sender<Response>) -> Result<()> {
     loop {
         tx.send(Response {
             status: 0,
             response_time: 0f32,
         })
         .await?;
-        delay_for(Duration::from_millis(250)).await;
+        sleep(Duration::from_millis(250)).await;
     }
 }
 
 async fn fetch_url(
     req_info: &RequestInfo<'_>,
     client: &Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>, hyper::Body>,
-    mut tx: mpsc::Sender<Response>,
+    tx: mpsc::Sender<Response>,
 ) -> Result<()> {
     loop {
         let start = SystemTime::now();
@@ -393,7 +391,7 @@ async fn fetch_url(
         })
         .await?;
 
-        delay_for(Duration::from_micros(1)).await;
+        sleep(Duration::from_micros(1)).await;
         if req_info.test {
             println!();
             break;
