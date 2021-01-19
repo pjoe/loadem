@@ -18,7 +18,7 @@ exclude = [
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-hyper = "0.14"
+hyper = { version = "0.14", features = ["full"] }
 tokio = { version = "1", features = ["full"] }
 hyper-rustls = "0.22"
 futures = "0.3"

@@ -1,5 +1,9 @@
 # loadem changelog
 
+## 0.2.9 - TBD
+
+- Add latency percentiles
+
 ## 0.2.8 - 14-jan-2021
 
 - Retry CI publish to Chocolatey
