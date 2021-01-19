@@ -25,19 +25,25 @@ choco install loadem
 
 ```
 $ loadem http://localhost 200
-URL: http://localhost/
+URL: http://localhost
 Clients: 200
 Starting
-MaTps 3410.85, Tps 3410.85, Err  0.00%, Resp Time  0.026
-MaTps 3718.58, Tps 4026.32, Err  0.00%, Resp Time  0.022
-MaTps 3732.09, Tps 3759.11, Err  0.00%, Resp Time  0.022
-MaTps 3871.03, Tps 4287.86, Err  0.00%, Resp Time  0.020
-MaTps 3941.79, Tps 4224.79, Err  0.00%, Resp Time  0.020
-MaTps 4027.94, Tps 4458.70, Err  0.00%, Resp Time  0.019
-MaTps 4102.18, Tps 4547.63, Err  0.00%, Resp Time  0.017
+MaTps 4777.17, Tps 4777.17, Err  0.00%, Lat Avg  0.018, P50  0.009, P99  0.200, P99.9  0.220
+MaTps 4912.00, Tps 5046.83, Err  0.00%, Lat Avg  0.016, P50  0.009, P99  0.157, P99.9  0.341
+MaTps 4929.57, Tps 4964.71, Err  0.00%, Lat Avg  0.014, P50  0.009, P99  0.111, P99.9  0.191
+MaTps 4470.94, Tps 3095.06, Err  0.00%, Lat Avg  0.020, P50  0.015, P99  0.152, P99.9  0.238
+MaTps 4356.89, Tps 3900.69, Err  0.00%, Lat Avg  0.023, P50  0.011, P99  0.429, P99.9  0.469
+MaTps 4302.34, Tps 4029.58, Err  0.00%, Lat Avg  0.021, P50  0.012, P99  0.158, P99.9  0.470
+MaTps 4295.27, Tps 4252.88, Err  0.00%, Lat Avg  0.022, P50  0.010, P99  0.540, P99.9  0.543
 ^C
-Completed 30743 requests in 7.47 seconds
-Total TPS: 4114.94
-Avg. Response time:  0.021
-Max Response time:   3.155
+URL: http://localhost
+Clients: 200
+Completed 31825 requests in 7.45 seconds
+Total TPS: 4274.48
+Latency:
+ Avg.   0.019
+ P50    0.010
+ P99    0.200
+ P99.9  0.541
+ Max    0.544
 ```
