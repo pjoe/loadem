@@ -1,6 +1,6 @@
 # loadem changelog
 
-## 0.2.9 - TBD
+## 0.2.9 - 20-jan-2021
 
 - Add latency percentiles
 
