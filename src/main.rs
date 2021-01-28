@@ -6,14 +6,19 @@ use futures::{
     select,
 };
 use hyper::{body::HttpBody as _, client, Body, Client, Method, Request};
+use rustls::{RootCertStore, ServerCertVerified, ServerCertVerifier, TLSError};
 use simple_error::SimpleError;
 use std::{
     collections::VecDeque,
     env, fs, io,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::{Duration, SystemTime},
 };
 use tokio::{io as tokio_io, io::AsyncWriteExt as _, sync::mpsc, time::sleep};
+use webpki::DNSNameRef;
 
 mod stats;
 
@@ -32,6 +37,19 @@ struct RequestInfo<'a> {
     test: bool,
     headers: Vec<(&'a str, &'a str)>,
     data: &'a String,
+}
+
+struct NoVerifier;
+impl ServerCertVerifier for NoVerifier {
+    fn verify_server_cert(
+        &self,
+        _roots: &RootCertStore,
+        _presented_certs: &[rustls::Certificate],
+        _dns_name: DNSNameRef<'_>,
+        _ocsp_response: &[u8],
+    ) -> std::result::Result<ServerCertVerified, TLSError> {
+        Ok(ServerCertVerified::assertion())
+    }
 }
 
 fn main() {
@@ -100,6 +118,12 @@ async fn loadem() -> Result<()> {
                     .help("HTTP method to use")
                     .takes_value(true),
             )
+            .arg(
+                Arg::with_name("insecure")
+                    .long("insecure")
+                    .short("k")
+                    .help("Don't validate TLS certificates"),
+            )
             .get_matches();
 
     let url = matches.value_of("URL").unwrap();
@@ -158,6 +182,7 @@ async fn loadem() -> Result<()> {
     };
     println!("URL: {}", req_info.url);
     println!("Clients: {}", clients);
+    let no_verifier = NoVerifier {};
     let https = match matches.value_of("cert") {
         Some(cert_file) => {
             println!("Custom cert: {}", cert_file);
@@ -175,7 +200,30 @@ async fn loadem() -> Result<()> {
             // Join the above part into an HTTPS connector.
             hyper_rustls::HttpsConnector::from((http, tls))
         }
-        _ => hyper_rustls::HttpsConnector::with_native_roots(),
+        _ => {
+            // Build an HTTP connector which supports HTTPS too.
+            let mut http = client::HttpConnector::new();
+            http.enforce_http(false);
+
+            let mut tls = rustls::ClientConfig::new();
+            tls.root_store = match rustls_native_certs::load_native_certs() {
+                Ok(store) => store,
+                Err((Some(store), err)) => {
+                    println!("Could not load all certificates: {:?}", err);
+                    store
+                }
+                Err((None, err)) => Err(err).expect("cannot access native cert store"),
+            };
+            if tls.root_store.is_empty() {
+                panic!("no CA certificates found");
+            }
+
+            if matches.is_present("insecure") {
+                tls.dangerous()
+                    .set_certificate_verifier(Arc::new(no_verifier));
+            }
+            hyper_rustls::HttpsConnector::from((http, tls))
+        }
     };
 
     let (tx, rx) = mpsc::channel::<Response>(100);

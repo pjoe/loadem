@@ -376,7 +376,7 @@ checksum = "89203f3fba0a3795506acaad8ebce3c80c0af93f994d5a1d7a0b1eeb23271929"
 
 [[package]]
 name = "loadem"
-version = "0.2.9"
+version = "0.2.10"
 dependencies = [
  "clap",
  "ctrlc",
@@ -384,8 +384,10 @@ dependencies = [
  "hyper",
  "hyper-rustls",
  "rustls",
+ "rustls-native-certs",
  "simple-error",
  "tokio",
+ "webpki",
 ]
 
 [[package]]
