@@ -1,5 +1,9 @@
 # loadem changelog
 
+## 0.2.10 - 28-jan-2021
+
+- Add support for self signed certs
+
 ## 0.2.9 - 20-jan-2021
 
 - Add latency percentiles
