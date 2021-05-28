@@ -35,6 +35,7 @@ struct RequestInfo<'a> {
     url: &'a str,
     method: &'a Method,
     test: bool,
+    verbose: bool,
     headers: Vec<(&'a str, &'a str)>,
     data: &'a String,
 }
@@ -96,6 +97,12 @@ async fn loadem() -> Result<()> {
                 "Test mode. No throughput measurements. Full response (with headers) is shown",
             ))
             .arg(
+                Arg::with_name("verbose")
+                    .long("verbose")
+                    .short("v")
+                    .help("Verbose. Errors are logged to stderr"),
+            )
+            .arg(
                 Arg::with_name("header")
                     .long("header")
                     .short("H")
@@ -130,6 +137,7 @@ async fn loadem() -> Result<()> {
     url.parse::<hyper::Uri>().unwrap();
 
     let test = matches.is_present("test");
+    let verbose = matches.is_present("verbose");
     let clients = if test {
         1
     } else {
@@ -179,6 +187,7 @@ async fn loadem() -> Result<()> {
         headers,
         data: &data,
         test,
+        verbose,
     };
     println!("URL: {}", req_info.url);
     println!("Clients: {}", clients);
@@ -246,7 +255,8 @@ async fn loadem() -> Result<()> {
         _ = heart_beat(tx.clone()).fuse() => {}
         _ = timeout(time_limit, tx.clone()).fuse() => {}
     }
-    Ok(())
+    // force quit, to avoid any hanging zombies
+    std::process::exit(0);
 }
 
 async fn timeout(limit: u64, tx: mpsc::Sender<Response>) -> Result<()> {
@@ -356,16 +366,15 @@ async fn status(
     stats::extend_sorted(&mut latencies, &new_latencies);
     let elapsed = start_time.elapsed().unwrap().as_secs_f32();
     let total_count = total_ok + total_error;
+    let total_err_percent = total_error as f32 * 100f32 / total_count as f32;
     let mut resp_avg = 0f32;
     if total_count > 0 {
         resp_avg = total_resp_time / total_count as f32;
     }
     println!("URL: {}", url);
     println!("Clients: {}", clients);
-    println!(
-        "Completed {} requests in {:.2} seconds",
-        total_count, elapsed
-    );
+    println!("Completed {} requests in {:.2}", total_count, elapsed);
+    println!("Errors: {:.4}%", total_err_percent);
     println!("Total TPS: {:.2}", total_ok as f32 / elapsed);
     println!("Latency:");
     println!(" Avg.  {:>6.3}", resp_avg);
@@ -415,11 +424,13 @@ async fn fetch_url(
                     println!("Headers: {:#?}\n", res.headers());
                     println!("Body:");
                 }
-                // Stream the body, writing each chunk to stdout as we get it
-                // (instead of buffering and printing at the end).
+                // Stream the body,
                 while let Some(next) = res.data().await {
                     let chunk = next;
-                    if chunk.is_err() {
+                    if let Err(e) = chunk {
+                        if req_info.verbose {
+                            eprintln!("Error: {}", e);
+                        }
                         status = 901;
                         break;
                     }
@@ -430,7 +441,12 @@ async fn fetch_url(
 
                 status
             }
-            _ => 900,
+            Err(e) => {
+                if req_info.verbose {
+                    eprintln!("Error: {}", e);
+                }
+                900
+            }
         };
         let response_time = start.elapsed().unwrap().as_secs_f32();
         tx.send(Response {

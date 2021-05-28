@@ -1,5 +1,11 @@
 # loadem changelog
 
+## 0.2.11 - 28-may-2021
+
+- Add verbose flag for some error output
+- Add total error % to summary output
+- Fix occational hang after completion
+
 ## 0.2.10 - 28-jan-2021
 
 - Add support for self signed certs
