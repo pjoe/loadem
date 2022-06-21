@@ -1,6 +1,6 @@
 use std::f32::NAN;
 
-pub fn sort(data: &mut Vec<f32>) {
+pub fn sort(data: &mut [f32]) {
     data.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
 }
 
