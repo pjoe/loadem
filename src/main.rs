@@ -88,24 +88,24 @@ async fn loadem() -> Result<()> {
             .arg(
                 Arg::with_name("time-limit")
                     .long("time-limit")
-                    .short("l")
+                    .short('l')
                     .help("Time limit. Test will end after specified number of seconds")
                     .default_value("0")
                     .takes_value(true),
             )
-            .arg(Arg::with_name("test").long("test").short("t").help(
+            .arg(Arg::with_name("test").long("test").short('t').help(
                 "Test mode. No throughput measurements. Full response (with headers) is shown",
             ))
             .arg(
                 Arg::with_name("verbose")
                     .long("verbose")
-                    .short("v")
+                    .short('v')
                     .help("Verbose. Errors are logged to stderr"),
             )
             .arg(
                 Arg::with_name("header")
                     .long("header")
-                    .short("H")
+                    .short('H')
                     .help("Add HTTP request header(s)")
                     .multiple(true)
                     .takes_value(true),
@@ -113,7 +113,7 @@ async fn loadem() -> Result<()> {
             .arg(
                 Arg::with_name("data")
                     .long("data")
-                    .short("d")
+                    .short('d')
                     .help("Raw data to be sent with request")
                     .multiple(true)
                     .takes_value(true),
@@ -121,14 +121,14 @@ async fn loadem() -> Result<()> {
             .arg(
                 Arg::with_name("method")
                     .long("method")
-                    .short("X")
+                    .short('X')
                     .help("HTTP method to use")
                     .takes_value(true),
             )
             .arg(
                 Arg::with_name("insecure")
                     .long("insecure")
-                    .short("k")
+                    .short('k')
                     .help("Don't validate TLS certificates"),
             )
             .get_matches();
